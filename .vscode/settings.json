@@ -1,0 +1,14 @@
+{
+    "cmake.configureOnOpen": true,
+    "files.associations": {
+        "task.h": "c",
+        "adc.h": "c",
+        "esp_log.h": "c",
+        "adc_cali_scheme.h": "c",
+        "pulse_cnt.h": "c",
+        "adc_oneshot.h": "c",
+        "sensors.h": "c",
+        "esp_timer.h": "c",
+        "am2320.h": "c"
+    }
+}
