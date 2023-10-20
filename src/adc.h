@@ -1,3 +1,6 @@
+#ifndef __ADC_H__
+#define __ADC_H__
+
 #include "esp_adc/adc_oneshot.h"
 
 typedef struct adc_oneshot_unit {
@@ -33,3 +36,5 @@ bool adc_calibration_init(adc_unit_t unit, adc_channel_t channel, adc_atten_t at
  * @param cali_handle The calibration handle to deinitialize
  */
 void adc_calibration_deinit(adc_cali_handle_t cali_handle);
+
+#endif
