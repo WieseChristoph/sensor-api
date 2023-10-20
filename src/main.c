@@ -5,14 +5,18 @@
 #include "am2320.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_log.h"
+#include "nvs_flash.h"
 #include "sdkconfig.h"
 #include "sensors.h"
 #include "adc.h"
+#include "wifi.h"
+#include "secrets.h"
 
-const static char *TAG = "sensor-prometheus";
+const static char *TAG = "sensor_api";
 
 #define RED_GPIO GPIO_NUM_14
 #define GREEN_GPIO GPIO_NUM_13
+#define RESET_GPIO GPIO_NUM_25
 #define PHOTO_GPIO_ADC ADC_CHANNEL_7
 #define HEARTRATE_GPIO_ADC ADC_CHANNEL_6
 #define I2C_MASTER_SCL 22
@@ -23,12 +27,58 @@ const static char *TAG = "sensor-prometheus";
 
 #define ADC_ATTEN ADC_ATTEN_DB_11
 
+static QueueHandle_t gpio_evt_queue = NULL;
+
+void IRAM_ATTR gpio_isr_handler(void* arg) {
+    uint32_t gpio_num = (uint32_t) arg;
+    xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
+}
+
+void gpio_task(void* arg) {
+    uint32_t io_num;
+    for (;;) {
+        if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+            switch (io_num) {
+                case RESET_GPIO:
+                    ESP_LOGI(TAG, "Resetting...");
+                    ESP_ERROR_CHECK(nvs_flash_erase());
+                    esp_restart();
+                    break;
+            }
+        }
+    }
+}
+
 void app_main() {
+    // -------------NVS Init---------------//
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    wifi_init_sta(WIFI_SSID, WIFI_PASS);
+
     //-------------GPIO Init---------------//
     gpio_reset_pin(RED_GPIO);
-    gpio_reset_pin(GREEN_GPIO);
     gpio_set_direction(RED_GPIO, GPIO_MODE_INPUT_OUTPUT);
+    gpio_reset_pin(GREEN_GPIO);
     gpio_set_direction(GREEN_GPIO, GPIO_MODE_INPUT_OUTPUT);
+    
+    gpio_set_direction(RESET_GPIO, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(RESET_GPIO, GPIO_PULLDOWN_ONLY);
+    gpio_set_intr_type(RESET_GPIO, GPIO_INTR_POSEDGE);
+
+    // Create a queue to handle gpio event from isr
+    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+
+    // Start gpio task
+    xTaskCreate(gpio_task, "gpio_task", 2048, NULL, 10, NULL);
+
+    // Install gpio isr service
+    ESP_ERROR_CHECK(gpio_install_isr_service(0));
+    ESP_ERROR_CHECK(gpio_isr_handler_add(RESET_GPIO, gpio_isr_handler, (void*) RESET_GPIO));
 
     //-------------AM2320 Init---------------//
     i2c_dev_t am2320_i2c_dev = {0};

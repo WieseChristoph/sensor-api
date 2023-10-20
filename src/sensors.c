@@ -57,7 +57,7 @@ u_int8_t get_heart_rate(adc_oneshot_unit_handle_t *unit_handle, adc_channel_t ch
             return 0;
         }
 
-        // block the minimum amount of time between samples
+        // Block the minimum amount of time between samples
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 
