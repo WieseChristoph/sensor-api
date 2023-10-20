@@ -6,58 +6,33 @@
 
 static const char* TAG = "sensors";
 
-// TODO: output data as pointer to struct in params
-am2320_data_t* get_am2320_data(i2c_dev_t* dev) {
-    am2320_data_t* data = calloc(1, sizeof(am2320_data_t));
-    if (data == NULL) {
-        ESP_LOGE(TAG, "Error allocating memory for am2320 data");
-        return NULL;
-    }
-
-    data->temperature = 0;
-    data->humidity = 0;
-
-    esp_err_t res = am2320_get_rht(dev, &data->temperature, &data->humidity);
+void get_am2320_data(i2c_dev_t* dev, am2320_data_t* out_data) {
+    esp_err_t res = am2320_get_rht(dev, &out_data->temperature, &out_data->humidity);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Error reading data: %d (%s)", res, esp_err_to_name(res));
     }
-
-    return data;
 }
 
-// TODO: output data as pointer to struct in params
-photo_data_t* get_photo_data(adc_oneshot_unit_handle_t* adc_handle, adc_channel_t channel, adc_cali_handle_t* adc_cali_handle, bool do_calibration_photo, u_int32_t photo_resistor, float input_voltage) {
-    photo_data_t* data = calloc(1, sizeof(photo_data_t));
-    if (data == NULL) {
-        ESP_LOGE(TAG, "Error allocating memory for photo data");
-        return NULL;
+void get_photo_data(adc_oneshot_unit_handle_t* unit_handle, adc_channel_t channel, adc_cali_handle_t* cali_handle, bool is_calibrated, u_int32_t series_resistor, float input_voltage, photo_data_t *out_data) {
+    ESP_ERROR_CHECK(adc_oneshot_read(*unit_handle, channel, &out_data->raw));
+
+    if (is_calibrated) {
+        ESP_ERROR_CHECK(adc_cali_raw_to_voltage(*cali_handle, out_data->raw, &out_data->voltage));
+        float voltage_v = out_data->voltage / 1000.0;
+        out_data->resistence = (series_resistor * (input_voltage - voltage_v))/voltage_v;
+        out_data->lux = 500 / (out_data->resistence / 1000);
     }
-
-    data->raw = 0;
-    data->voltage = 0;
-    data->resistence = 0;
-    data->lux = 0;
-
-    ESP_ERROR_CHECK(adc_oneshot_read(*adc_handle, channel, &data->raw));
-
-    if (do_calibration_photo) {
-        ESP_ERROR_CHECK(adc_cali_raw_to_voltage(*adc_cali_handle, data->raw, &data->voltage));
-        float voltage_v = data->voltage / 1000.0;
-        data->resistence = (photo_resistor * (input_voltage - voltage_v))/voltage_v;
-        data->lux = 500 / (data->resistence / 1000);
-    }
-
-    return data;
 }
 
-u_int8_t get_heart_rate(adc_oneshot_unit_handle_t *adc_handle, adc_channel_t adc_channel, u_int16_t heartbeat_threshold, u_int8_t required_beats, u_int8_t timeout_s, gpio_num_t led_gpio) {
+u_int8_t get_heart_rate(adc_oneshot_unit_handle_t *unit_handle, adc_channel_t channel, u_int16_t heartbeat_threshold, u_int8_t required_beats, u_int8_t timeout_s, gpio_num_t led_gpio) {
     int heartrate_raw = 0;
+    int64_t timeout_start = esp_timer_get_time();
     int64_t start_time = 0;
     bool pulse_started = false;
     int beats_detected = 0;
 
     while (beats_detected < required_beats) {
-        ESP_ERROR_CHECK(adc_oneshot_read(*adc_handle, adc_channel, &heartrate_raw));
+        ESP_ERROR_CHECK(adc_oneshot_read(*unit_handle, channel, &heartrate_raw));
         
         if (!pulse_started && heartrate_raw >= heartbeat_threshold) {
             if (led_gpio != GPIO_NUM_NC) {
@@ -75,7 +50,7 @@ u_int8_t get_heart_rate(adc_oneshot_unit_handle_t *adc_handle, adc_channel_t adc
             beats_detected++;
         }
 
-        if (start_time != 0 && esp_timer_get_time() - start_time > timeout_s * 1000000) {
+        if (esp_timer_get_time() - timeout_start > timeout_s * 1000000) {
             if (led_gpio != GPIO_NUM_NC) {
                 gpio_set_level(led_gpio, 0);
             }

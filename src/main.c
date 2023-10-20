@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "am2320.h"
 #include "esp_adc/adc_oneshot.h"
@@ -37,11 +36,12 @@ void app_main() {
     ESP_ERROR_CHECK(am2320_init_desc(&am2320_i2c_dev, 0, I2C_MASTER_SDA, I2C_MASTER_SCL));
 
     //-------------ADC Init---------------//
-    adc_oneshot_unit_t *adc_oneshot = adc_oneshot_unit_init(ADC_UNIT_1, ADC_ATTEN);
+    adc_oneshot_unit_t adc_oneshot = {0};
+    adc_oneshot_unit_init(ADC_UNIT_1, ADC_ATTEN, &adc_oneshot);
 
     //-------------ADC Config---------------//
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(*adc_oneshot->adc_handle, PHOTO_GPIO_ADC, adc_oneshot->adc_chan_config));
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(*adc_oneshot->adc_handle, HEARTRATE_GPIO_ADC, adc_oneshot->adc_chan_config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_oneshot.adc_handle, PHOTO_GPIO_ADC, &adc_oneshot.adc_chan_config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_oneshot.adc_handle, HEARTRATE_GPIO_ADC, &adc_oneshot.adc_chan_config));
 
     //-------------ADC Calibration Init---------------//
     adc_cali_handle_t adc1_cali_photo_handle = NULL;
@@ -56,17 +56,17 @@ void app_main() {
         gpio_set_level(GREEN_GPIO, gpio_get_level(RED_GPIO) ^ 1);
 
         // //-------------Photo-Sensor Read---------------//
-        photo_data_t* photo_data = get_photo_data(adc_oneshot->adc_handle, PHOTO_GPIO_ADC, &adc1_cali_photo_handle, is_calibrated_photo, PHOTO_RESISTOR, INPUT_VOLTAGE);
-        ESP_LOGI(TAG, "ADC%d Channel[%d] [Photo] Raw: %d, Voltage: %d mV, Resistence: %f Ohm, Intensity: %f Lux", ADC_UNIT_1 + 1, PHOTO_GPIO_ADC, photo_data->raw, photo_data->voltage, photo_data->resistence, photo_data->lux);
-        free(photo_data);
+        photo_data_t photo_data = {0};
+        get_photo_data(&adc_oneshot.adc_handle, PHOTO_GPIO_ADC, &adc1_cali_photo_handle, is_calibrated_photo, PHOTO_RESISTOR, INPUT_VOLTAGE, &photo_data);
+        ESP_LOGI(TAG, "ADC%d Channel[%d] [Photo] Raw: %d, Voltage: %d mV, Resistence: %f Ohm, Intensity: %f Lux", ADC_UNIT_1 + 1, PHOTO_GPIO_ADC, photo_data.raw, photo_data.voltage, photo_data.resistence, photo_data.lux);
 
         //-------------AM2320 Read---------------//
-        am2320_data_t* temp_hum_data = get_am2320_data(&am2320_i2c_dev);
-        ESP_LOGI(TAG, "Temperature: %.1f°C, Humidity: %.1f%%", temp_hum_data->temperature, temp_hum_data->humidity);
-        free(temp_hum_data);
+        am2320_data_t temp_hum_data = {0};
+        get_am2320_data(&am2320_i2c_dev, &temp_hum_data);
+        ESP_LOGI(TAG, "Temperature: %.1f°C, Humidity: %.1f%%", temp_hum_data.temperature, temp_hum_data.humidity);
 
         //-------------Heart-Rate Read---------------//
-        u_int8_t bpm = get_heart_rate(adc_oneshot->adc_handle, HEARTRATE_GPIO_ADC, 3000, 5, 5, GREEN_GPIO);
+        u_int8_t bpm = get_heart_rate(&adc_oneshot.adc_handle, HEARTRATE_GPIO_ADC, 3000, 5, 5, GREEN_GPIO);
         ESP_LOGI(TAG, "Heartrate: %d Bpm", bpm);
 
         //-------------LED Toggle---------------//
@@ -78,9 +78,8 @@ void app_main() {
     }
 
     // Tear Down ADC
-    ESP_ERROR_CHECK(adc_oneshot_del_unit(*adc_oneshot->adc_handle));
+    ESP_ERROR_CHECK(adc_oneshot_del_unit(adc_oneshot.adc_handle));
     if (is_calibrated_photo) {
         adc_calibration_deinit(adc1_cali_photo_handle);
     }
-    adc_oneshot_unit_free(adc_oneshot);
 }
