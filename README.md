@@ -16,6 +16,12 @@ The WIFI SSID and password are stored in the `secrets.h` file in the `include/` 
 
 You can rename the `secrets.h.example` to `secrets.h` and fill in your information.
 
+## Grafana
+
+You can import the Grafana dashboard from the `grafana-dashboard.json` file.
+
+![Grafana dashboard](.github/grafana_dashboard.png)
+
 ## Electrical components
 
 - [ESP-WROOM-32](https://aliexpress.com/item/1005005688016405.html)
