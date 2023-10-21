@@ -16,7 +16,6 @@ struct webserver_sensor_data {
     u_int8_t required_heartbeats;
     u_int8_t heartbeat_timeout_s;
     gpio_num_t heatbeat_led_gpio;
-
 } typedef webserver_sensor_data_t;
 
 /**
