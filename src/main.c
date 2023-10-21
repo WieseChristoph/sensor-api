@@ -26,8 +26,8 @@ const static char *TAG = "sensor_api";
 #define INPUT_VOLTAGE 3.3
 #define PHOTO_RESISTOR 10000
 #define HEARTBEAT_THRESHOLD 3000
-#define REQUIRED_HEARTBEATS 5
-#define HEARTBEAT_TIMEOUT_S 7
+#define REQUIRED_HEARTBEATS 7
+#define HEARTBEAT_TIMEOUT_MS 1500
 #define ADC_ATTEN ADC_ATTEN_DB_11
 
 static QueueHandle_t gpio_evt_queue = NULL;
@@ -116,7 +116,7 @@ void app_main() {
         .heartrate_adc_channel = HEARTRATE_GPIO_ADC,
         .heartbeat_threshold = HEARTBEAT_THRESHOLD,
         .required_heartbeats = REQUIRED_HEARTBEATS,
-        .heartbeat_timeout_s = HEARTBEAT_TIMEOUT_S,
+        .heartbeat_timeout_ms = HEARTBEAT_TIMEOUT_MS,
         .heatbeat_led_gpio = RED_GPIO
     };
     httpd_handle_t server = start_webserver(80, &webserver_sensor_data);

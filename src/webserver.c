@@ -63,7 +63,7 @@ static esp_err_t get_heartrate_handler(httpd_req_t *req) {
         webserver_sensor_data->heartrate_adc_channel, 
         webserver_sensor_data->heartbeat_threshold, 
         webserver_sensor_data->required_heartbeats, 
-        webserver_sensor_data->heartbeat_timeout_s, 
+        webserver_sensor_data->heartbeat_timeout_ms, 
         webserver_sensor_data->heatbeat_led_gpio
     );
 
@@ -97,7 +97,7 @@ static esp_err_t get_metrics_handler(httpd_req_t *req) {
         webserver_sensor_data->heartrate_adc_channel, 
         webserver_sensor_data->heartbeat_threshold, 
         webserver_sensor_data->required_heartbeats, 
-        webserver_sensor_data->heartbeat_timeout_s, 
+        webserver_sensor_data->heartbeat_timeout_ms, 
         webserver_sensor_data->heatbeat_led_gpio
     );
 

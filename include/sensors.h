@@ -43,9 +43,9 @@ void get_photo_data(adc_oneshot_unit_handle_t* unit_handle, adc_channel_t channe
  * @param channel ADC channel to read from
  * @param heartbeat_threshold The threshold value for detecting a heart rate pulse
  * @param required_beats The number of heart rate pulses required to calculate the BPM
- * @param timeout_s The timeout in seconds for the heart rate calculation
+ * @param timeout_ms The timeout in milliseconds for detecting a single heart rate pulse
  * @param led_gpio The GPIO pin to use for the heartbeat LED (use GPIO_NUM_NC for no LED)
  * 
  * @return The heart rate in BPM
  */
-u_int8_t get_heart_rate(adc_oneshot_unit_handle_t *unit_handle, adc_channel_t channel, u_int16_t heartbeat_threshold, u_int8_t required_beats, u_int8_t timeout_s, gpio_num_t led_gpio);
+u_int8_t get_heart_rate(adc_oneshot_unit_handle_t *unit_handle, adc_channel_t channel, u_int16_t heartbeat_threshold, u_int8_t required_beats, u_int32_t timeout_ms, gpio_num_t led_gpio);
