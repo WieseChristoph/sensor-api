@@ -1,5 +1,6 @@
 // https://github.com/espressif/esp-idf/blob/master/examples/wifi/getting_started/station/main/station_example_main.c
 
+#include "wifi.h"
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -7,6 +8,7 @@
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
+#include "netdb.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -27,26 +29,33 @@ static const char *TAG = "wifi_station";
 static int s_retry_num = 0;
 
 static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+    gpio_num_t *disconnect_led_pin = (gpio_num_t *) arg;
+
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        gpio_set_level(*disconnect_led_pin, 1);
         if (s_retry_num < MAXIMUM_RETRIES) {
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "retry to connect to the AP");
         } else {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+            // restart the esp when all retries are exhausted
+            // this is a workaround for a bug where the esp disconnects from the wifi after a few hours and never reconnects
+            esp_restart();
         }
         ESP_LOGI(TAG,"connect to the AP fail");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        gpio_set_level(*disconnect_led_pin, 0);
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "got ip: " IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
 
-void wifi_init_sta(char *ssid, char *pass) {
+void wifi_init_sta(char *ssid, char *pass, gpio_num_t *disconnect_led_pin) {
     s_wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
@@ -59,15 +68,15 @@ void wifi_init_sta(char *ssid, char *pass) {
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &instance_got_ip));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, disconnect_led_pin, &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, disconnect_led_pin, &instance_got_ip));
 
     wifi_config_t wifi_config = {0};
     strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
     strncpy((char *)wifi_config.sta.password, pass, sizeof(wifi_config.sta.password) - 1);
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start() );
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");

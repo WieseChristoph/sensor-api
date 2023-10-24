@@ -11,24 +11,10 @@
 #include "adc.h"
 #include "wifi.h"
 #include "webserver.h"
+#include "config.h"
 #include "secrets.h"
 
 const static char *TAG = "sensor_api";
-
-#define RED_GPIO GPIO_NUM_14
-#define GREEN_GPIO GPIO_NUM_13
-#define RESET_GPIO GPIO_NUM_25
-#define PHOTO_GPIO_ADC ADC_CHANNEL_7
-#define HEARTRATE_GPIO_ADC ADC_CHANNEL_6
-#define I2C_MASTER_SCL 22
-#define I2C_MASTER_SDA 21
-
-#define INPUT_VOLTAGE 3.3
-#define PHOTO_RESISTOR 10000
-#define HEARTBEAT_THRESHOLD 3000
-#define REQUIRED_HEARTBEATS 7
-#define HEARTBEAT_TIMEOUT_MS 1500
-#define ADC_ATTEN ADC_ATTEN_DB_11
 
 static QueueHandle_t gpio_evt_queue = NULL;
 
@@ -42,7 +28,7 @@ void gpio_task(void* arg) {
     for (;;) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
             switch (io_num) {
-                case RESET_GPIO:
+                case RESET_BUTTON_GPIO:
                     ESP_LOGI(TAG, "Resetting...");
                     ESP_ERROR_CHECK(nvs_flash_erase());
                     esp_restart();
@@ -54,12 +40,12 @@ void gpio_task(void* arg) {
 
 void app_main() {
     //-------------LED GPIO Init---------------//
-    gpio_reset_pin(RED_GPIO);
-    gpio_set_direction(RED_GPIO, GPIO_MODE_INPUT_OUTPUT);
-    gpio_set_level(RED_GPIO, 1);
-    gpio_reset_pin(GREEN_GPIO);
-    gpio_set_direction(GREEN_GPIO, GPIO_MODE_INPUT_OUTPUT);
-    gpio_set_level(GREEN_GPIO, 0);
+    gpio_reset_pin(WIFI_DISCONNECT_LED_GPIO);
+    gpio_set_direction(WIFI_DISCONNECT_LED_GPIO, GPIO_MODE_INPUT_OUTPUT);
+    gpio_set_level(WIFI_DISCONNECT_LED_GPIO, 1);
+    gpio_reset_pin(HEARTBEAT_LED_GPIO);
+    gpio_set_direction(HEARTBEAT_LED_GPIO, GPIO_MODE_INPUT_OUTPUT);
+    gpio_set_level(HEARTBEAT_LED_GPIO, 0);
 
     // -------------NVS Init---------------//
     esp_err_t ret = nvs_flash_init();
@@ -70,12 +56,13 @@ void app_main() {
     ESP_ERROR_CHECK(ret);
 
     //-------------WiFi Init---------------//
-    wifi_init_sta(WIFI_SSID, WIFI_PASS);
+    gpio_num_t disconnect_led_pin = WIFI_DISCONNECT_LED_GPIO;
+    wifi_init_sta(WIFI_SSID, WIFI_PASS, &disconnect_led_pin);
     
     //-------------Reset GPIO Init---------------//
-    gpio_set_direction(RESET_GPIO, GPIO_MODE_INPUT);
-    gpio_set_pull_mode(RESET_GPIO, GPIO_PULLDOWN_ONLY);
-    gpio_set_intr_type(RESET_GPIO, GPIO_INTR_POSEDGE);
+    gpio_set_direction(RESET_BUTTON_GPIO, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(RESET_BUTTON_GPIO, GPIO_PULLDOWN_ONLY);
+    gpio_set_intr_type(RESET_BUTTON_GPIO, GPIO_INTR_POSEDGE);
 
     // Create a queue to handle gpio event from isr
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
@@ -85,61 +72,59 @@ void app_main() {
 
     // Install gpio isr service
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
-    ESP_ERROR_CHECK(gpio_isr_handler_add(RESET_GPIO, gpio_isr_handler, (void*) RESET_GPIO));
+    ESP_ERROR_CHECK(gpio_isr_handler_add(RESET_BUTTON_GPIO, gpio_isr_handler, (void*) RESET_BUTTON_GPIO));
 
     //-------------AM2320 Init---------------//
     i2c_dev_t am2320_i2c_dev = {0};
     ESP_ERROR_CHECK(i2cdev_init());
-    ESP_ERROR_CHECK(am2320_init_desc(&am2320_i2c_dev, 0, I2C_MASTER_SDA, I2C_MASTER_SCL));
+    ESP_ERROR_CHECK(am2320_init_desc(&am2320_i2c_dev, 0, I2C_MASTER_SDA_PIN, I2C_MASTER_SCL_PIN));
 
     //-------------ADC Init---------------//
     adc_oneshot_unit_t adc_oneshot = {0};
     adc_oneshot_unit_init(ADC_UNIT_1, ADC_ATTEN, &adc_oneshot);
 
     //-------------ADC Config---------------//
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_oneshot.adc_handle, PHOTO_GPIO_ADC, &adc_oneshot.adc_chan_config));
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_oneshot.adc_handle, HEARTRATE_GPIO_ADC, &adc_oneshot.adc_chan_config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_oneshot.adc_handle, PHOTO_SENSOR_GPIO_ADC, &adc_oneshot.adc_chan_config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_oneshot.adc_handle, HEARTRATE_SENSOR_GPIO_ADC, &adc_oneshot.adc_chan_config));
 
     //-------------ADC Calibration Init---------------//
     adc_cali_handle_t adc_cali_photo_handle = NULL;
-    bool photo_is_calibrated = adc_calibration_init(ADC_UNIT_1, PHOTO_GPIO_ADC, ADC_ATTEN, &adc_cali_photo_handle);
+    bool photo_is_calibrated = adc_calibration_init(ADC_UNIT_1, PHOTO_SENSOR_GPIO_ADC, ADC_ATTEN, &adc_cali_photo_handle);
 
     //-------------Webserver Init---------------//
     webserver_sensor_data_t webserver_sensor_data = {
         .am2320_i2c_dev = &am2320_i2c_dev,
         .adc_oneshot_unit = &adc_oneshot,
-        .photo_adc_channel = PHOTO_GPIO_ADC,
+        .photo_adc_channel = PHOTO_SENSOR_GPIO_ADC,
         .adc_cali_photo_handle = &adc_cali_photo_handle,
         .photo_is_calibrated = photo_is_calibrated,
-        .series_resistor = PHOTO_RESISTOR,
+        .series_resistor = PHOTO_SENSOR_SERIES_RESISTOR,
         .input_voltage = INPUT_VOLTAGE,
-        .heartrate_adc_channel = HEARTRATE_GPIO_ADC,
+        .heartrate_adc_channel = HEARTRATE_SENSOR_GPIO_ADC,
         .heartbeat_threshold = HEARTBEAT_THRESHOLD,
         .required_heartbeats = REQUIRED_HEARTBEATS,
         .heartbeat_timeout_ms = HEARTBEAT_TIMEOUT_MS,
-        .heatbeat_led_gpio = RED_GPIO
+        .heatbeat_led_gpio = HEARTBEAT_LED_GPIO
     };
     httpd_handle_t server = start_webserver(80, &webserver_sensor_data);
 
-    gpio_set_level(RED_GPIO, 0);
-
     // Keep main task alive
-    while (1) {
-        gpio_set_level(GREEN_GPIO, gpio_get_level(GREEN_GPIO) ^ 1);
+    for (;;) {
+        // gpio_set_level(GREEN_GPIO, gpio_get_level(GREEN_GPIO) ^ 1);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
-    // while (1) {
+    // for(;;) {
     //     ESP_LOGI(TAG, "-----------------------------");
 
     //     //-------------LED Toggle---------------//
-    //     gpio_set_level(RED_GPIO, gpio_get_level(RED_GPIO) ^ 1);
-    //     gpio_set_level(GREEN_GPIO, gpio_get_level(RED_GPIO) ^ 1);
+    //     gpio_set_level(WIFI_DISCONNECT_LED_GPIO, gpio_get_level(WIFI_DISCONNECT_LED_GPIO) ^ 1);
+    //     gpio_set_level(HEARTBEAT_LED_GPIO, gpio_get_level(HEARTBEAT_LED_GPIO) ^ 1);
 
     //     // //-------------Photo-Sensor Read---------------//
     //     photo_data_t photo_data = {0};
-    //     get_photo_data(&adc_oneshot.adc_handle, PHOTO_GPIO_ADC, &adc_cali_photo_handle, photo_is_calibrated, PHOTO_RESISTOR, INPUT_VOLTAGE, &photo_data);
-    //     ESP_LOGI(TAG, "ADC%d Channel[%d] [Photo] Raw: %d, Voltage: %d mV, Resistence: %f Ohm, Intensity: %f Lux", ADC_UNIT_1 + 1, PHOTO_GPIO_ADC, photo_data.raw, photo_data.voltage, photo_data.resistence, photo_data.lux);
+    //     get_photo_data(&adc_oneshot.adc_handle, PHOTO_SENSOR_GPIO_ADC, &adc_cali_photo_handle, photo_is_calibrated, PHOTO_SENSOR_SERIES_RESISTOR, INPUT_VOLTAGE, &photo_data);
+    //     ESP_LOGI(TAG, "ADC%d Channel[%d] [Photo] Raw: %d, Voltage: %d mV, Resistence: %f Ohm, Intensity: %f Lux", ADC_UNIT_1 + 1, PHOTO_SENSOR_GPIO_ADC, photo_data.raw, photo_data.voltage, photo_data.resistence, photo_data.lux);
 
     //     //-------------AM2320 Read---------------//
     //     am2320_data_t temp_hum_data = {0};
@@ -147,12 +132,12 @@ void app_main() {
     //     ESP_LOGI(TAG, "Temperature: %.1f°C, Humidity: %.1f%%", temp_hum_data.temperature, temp_hum_data.humidity);
 
     //     //-------------Heart-Rate Read---------------//
-    //     u_int8_t bpm = get_heart_rate(&adc_oneshot.adc_handle, HEARTRATE_GPIO_ADC, 3000, 5, 5, GREEN_GPIO);
+    //     u_int8_t bpm = get_heart_rate(&adc_oneshot.adc_handle, HEARTRATE_SENSOR_GPIO_ADC, 3000, 5, 5, HEARTBEAT_LED_GPIO);
     //     ESP_LOGI(TAG, "Heartrate: %d Bpm", bpm);
 
     //     //-------------LED Toggle---------------//
-    //     gpio_set_level(RED_GPIO, gpio_get_level(RED_GPIO) ^ 1);
-    //     gpio_set_level(GREEN_GPIO, gpio_get_level(RED_GPIO) ^ 1);
+    //     gpio_set_level(WIFI_DISCONNECT_LED_GPIO, gpio_get_level(WIFI_DISCONNECT_LED_GPIO) ^ 1);
+    //     gpio_set_level(HEARTBEAT_LED_GPIO, gpio_get_level(HEARTBEAT_LED_GPIO) ^ 1);
 
     //     //-------------1s Delay---------------//
     //     vTaskDelay(pdMS_TO_TICKS(1000));

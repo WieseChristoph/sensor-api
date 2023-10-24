@@ -10,7 +10,11 @@
 | /heartrate | Heart rate mesured by the KYTO2800D in bpm                                                               |
 | /metrics   | All data in [Prometheus exposition format](https://prometheus.io/docs/instrumenting/exposition_formats/) |
 
-## WIFI
+## Config
+
+Most of the configurable values, like the GPIO pins, are located in `include/config.h`.
+
+### WIFI
 
 The WIFI SSID and password are stored in the `secrets.h` file in the `include/` directory.
 
@@ -24,7 +28,7 @@ You can import the Grafana dashboard from the `grafana-dashboard.json` file.
 
 ## Electrical components
 
-- [ESP-WROOM-32](https://aliexpress.com/item/1005005688016405.html)
+- [DOIT ESP32 DevKit v1](https://aliexpress.com/item/1005005688016405.html)
 - [AM2320](https://aliexpress.com/item/32950694681.html)
 - [KYTO2800D](https://aliexpress.com/item/1005005244410482.html)
 - 5.3kHz non-coded heart rate transmitter (like the [KYTO2800C](https://www.aliexpress.com/item/32830159930.html))
