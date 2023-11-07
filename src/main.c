@@ -3,6 +3,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "am2320.h"
+#include "tsl2561.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -74,32 +75,30 @@ void app_main() {
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     ESP_ERROR_CHECK(gpio_isr_handler_add(RESET_BUTTON_GPIO, gpio_isr_handler, (void*) RESET_BUTTON_GPIO));
 
+    //-------------I2C Init---------------//
+    ESP_ERROR_CHECK(i2cdev_init());
+
     //-------------AM2320 Init---------------//
     i2c_dev_t am2320_i2c_dev = {0};
-    ESP_ERROR_CHECK(i2cdev_init());
-    ESP_ERROR_CHECK(am2320_init_desc(&am2320_i2c_dev, 0, I2C_MASTER_SDA_PIN, I2C_MASTER_SCL_PIN));
+    ESP_ERROR_CHECK(am2320_init_desc(&am2320_i2c_dev, I2C_NUM_0, I2C_SDA_PIN, I2C_SCL_PIN));
+
+    //-------------TSL2561 Init---------------//
+    tsl2561_t tsl2561_dev = {0};
+    ESP_ERROR_CHECK(tsl2561_init_desc(&tsl2561_dev, TSL2561_I2C_ADDR_FLOAT, I2C_NUM_0, I2C_SDA_PIN, I2C_SCL_PIN));
+    ESP_ERROR_CHECK(tsl2561_init(&tsl2561_dev));
 
     //-------------ADC Init---------------//
     adc_oneshot_unit_t adc_oneshot = {0};
     adc_oneshot_unit_init(ADC_UNIT_1, ADC_ATTEN, &adc_oneshot);
 
     //-------------ADC Config---------------//
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_oneshot.adc_handle, PHOTO_SENSOR_GPIO_ADC, &adc_oneshot.adc_chan_config));
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_oneshot.adc_handle, HEARTRATE_SENSOR_GPIO_ADC, &adc_oneshot.adc_chan_config));
-
-    //-------------ADC Calibration Init---------------//
-    adc_cali_handle_t adc_cali_photo_handle = NULL;
-    bool photo_is_calibrated = adc_calibration_init(ADC_UNIT_1, PHOTO_SENSOR_GPIO_ADC, ADC_ATTEN, &adc_cali_photo_handle);
 
     //-------------Webserver Init---------------//
     webserver_sensor_data_t webserver_sensor_data = {
         .am2320_i2c_dev = &am2320_i2c_dev,
+        .tsl2561_dev = &tsl2561_dev,
         .adc_oneshot_unit = &adc_oneshot,
-        .photo_adc_channel = PHOTO_SENSOR_GPIO_ADC,
-        .adc_cali_photo_handle = &adc_cali_photo_handle,
-        .photo_is_calibrated = photo_is_calibrated,
-        .series_resistor = PHOTO_SENSOR_SERIES_RESISTOR,
-        .input_voltage = INPUT_VOLTAGE,
         .heartrate_adc_channel = HEARTRATE_SENSOR_GPIO_ADC,
         .heartbeat_threshold = HEARTBEAT_THRESHOLD,
         .required_heartbeats = REQUIRED_HEARTBEATS,
@@ -148,7 +147,4 @@ void app_main() {
 
     // Tear Down ADC
     ESP_ERROR_CHECK(adc_oneshot_del_unit(adc_oneshot.adc_handle));
-    if (photo_is_calibrated) {
-        adc_calibration_deinit(adc_cali_photo_handle);
-    }
 }

@@ -5,22 +5,14 @@
 
 const static char *TAG = "webserver";
 
-static esp_err_t get_photo_handler(httpd_req_t *req) {
+static esp_err_t get_illuminance_handler(httpd_req_t *req) {
     webserver_sensor_data_t *webserver_sensor_data = (webserver_sensor_data_t *) req->user_ctx;
 
-    photo_data_t photo_data = {0};
-    get_photo_data(
-        &webserver_sensor_data->adc_oneshot_unit->adc_handle, 
-        webserver_sensor_data->photo_adc_channel, 
-        webserver_sensor_data->adc_cali_photo_handle, 
-        webserver_sensor_data->photo_is_calibrated, 
-        webserver_sensor_data->series_resistor, 
-        webserver_sensor_data->input_voltage, 
-        &photo_data
-    );
+    u_int32_t illuminance = 0;
+    tsl2561_read_lux(webserver_sensor_data->tsl2561_dev, &illuminance);
 
     char *resp;
-    asprintf(&resp, "%.3f Lux", photo_data.lux);
+    asprintf(&resp, "%ld Lux", illuminance);
 
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
@@ -78,16 +70,8 @@ static esp_err_t get_heartrate_handler(httpd_req_t *req) {
 static esp_err_t get_metrics_handler(httpd_req_t *req) {
     webserver_sensor_data_t *webserver_sensor_data = (webserver_sensor_data_t *) req->user_ctx;
 
-    photo_data_t photo_data = {0};
-    get_photo_data(
-        &webserver_sensor_data->adc_oneshot_unit->adc_handle, 
-        webserver_sensor_data->photo_adc_channel, 
-        webserver_sensor_data->adc_cali_photo_handle, 
-        webserver_sensor_data->photo_is_calibrated, 
-        webserver_sensor_data->series_resistor, 
-        webserver_sensor_data->input_voltage, 
-        &photo_data
-    );
+    u_int32_t illuminance = 0;
+    tsl2561_read_lux(webserver_sensor_data->tsl2561_dev, &illuminance);
 
     am2320_data_t am2320_data = {0};
     get_am2320_data(webserver_sensor_data->am2320_i2c_dev, &am2320_data);
@@ -104,9 +88,9 @@ static esp_err_t get_metrics_handler(httpd_req_t *req) {
     char *resp;
     asprintf(
         &resp,
-        "# HELP light_intensity_lux Light intensity in lux\n"
-        "# TYPE light_intensity_lux gauge\n"
-        "light_intensity_lux %.3f\n\n"
+        "# HELP illuminance_lux Light intensity in lux\n"
+        "# TYPE illuminance_lux gauge\n"
+        "illuminance_lux %ld\n\n"
         "# HELP temperature_celsius Temperature in celsius\n"
         "# TYPE temperature_celsius gauge\n"
         "temperature_celsius %.1f\n\n"
@@ -116,7 +100,7 @@ static esp_err_t get_metrics_handler(httpd_req_t *req) {
         "# HELP heartrate_bpm Heart rate in beats per minute\n"
         "# TYPE heartrate_bpm gauge\n"
         "heartrate_bpm %d"
-        , photo_data.lux, am2320_data.temperature, am2320_data.humidity, heartrate
+        , illuminance, am2320_data.temperature, am2320_data.humidity, heartrate
     );
 
     httpd_resp_set_type(req, "text/plain");
@@ -132,9 +116,9 @@ httpd_handle_t start_webserver(u_int16_t port, webserver_sensor_data_t *webserve
 
     httpd_uri_t uris[] = {
         {
-            .uri = "/photo",
+            .uri = "/illuminance",
             .method = HTTP_GET,
-            .handler = get_photo_handler,
+            .handler = get_illuminance_handler,
             .user_ctx = webserver_sensor_data
         },
         {
