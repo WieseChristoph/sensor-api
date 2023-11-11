@@ -7,8 +7,18 @@ const static char *TAG = "webserver";
 static esp_err_t get_illuminance_handler(httpd_req_t *req) {
     webserver_sensor_data_t *webserver_sensor_data = (webserver_sensor_data_t *) req->user_ctx;
 
+    if (xSemaphoreTake(webserver_sensor_data->semaphore, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Could not take semaphore!");
+        return ESP_FAIL;
+    }
+
     char *resp;
     asprintf(&resp, "%ld Lux", webserver_sensor_data->illuminance);
+
+    if (xSemaphoreGive(webserver_sensor_data->semaphore) != pdTRUE) {
+        ESP_LOGE(TAG, "Could not give semaphore!");
+        return ESP_FAIL;
+    }
 
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
@@ -18,8 +28,18 @@ static esp_err_t get_illuminance_handler(httpd_req_t *req) {
 static esp_err_t get_temp_handler(httpd_req_t *req) {
     webserver_sensor_data_t *webserver_sensor_data = (webserver_sensor_data_t *) req->user_ctx;
 
+    if (xSemaphoreTake(webserver_sensor_data->semaphore, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Could not take semaphore!");
+        return ESP_FAIL;
+    }
+
     char *resp;
     asprintf(&resp, "%.1f°C", webserver_sensor_data->temperature);
+
+    if (xSemaphoreGive(webserver_sensor_data->semaphore) != pdTRUE) {
+        ESP_LOGE(TAG, "Could not give semaphore!");
+        return ESP_FAIL;
+    }
 
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
@@ -29,8 +49,18 @@ static esp_err_t get_temp_handler(httpd_req_t *req) {
 static esp_err_t get_hum_handler(httpd_req_t *req) {
     webserver_sensor_data_t *webserver_sensor_data = (webserver_sensor_data_t *) req->user_ctx;
 
+    if (xSemaphoreTake(webserver_sensor_data->semaphore, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Could not take semaphore!");
+        return ESP_FAIL;
+    }
+
     char *resp;
     asprintf(&resp, "%.1f%%", webserver_sensor_data->humidity);
+
+    if (xSemaphoreGive(webserver_sensor_data->semaphore) != pdTRUE) {
+        ESP_LOGE(TAG, "Could not give semaphore!");
+        return ESP_FAIL;
+    }
 
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
@@ -40,8 +70,18 @@ static esp_err_t get_hum_handler(httpd_req_t *req) {
 static esp_err_t get_heartrate_handler(httpd_req_t *req) {
     webserver_sensor_data_t *webserver_sensor_data = (webserver_sensor_data_t *) req->user_ctx;
 
+    if (xSemaphoreTake(webserver_sensor_data->semaphore, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Could not take semaphore!");
+        return ESP_FAIL;
+    }
+
     char *resp;
     asprintf(&resp, "%d BPM", webserver_sensor_data->heartrate);
+
+    if (xSemaphoreGive(webserver_sensor_data->semaphore) != pdTRUE) {
+        ESP_LOGE(TAG, "Could not give semaphore!");
+        return ESP_FAIL;
+    }
 
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
@@ -50,6 +90,11 @@ static esp_err_t get_heartrate_handler(httpd_req_t *req) {
 
 static esp_err_t get_metrics_handler(httpd_req_t *req) {
     webserver_sensor_data_t *webserver_sensor_data = (webserver_sensor_data_t *) req->user_ctx;
+
+    if (xSemaphoreTake(webserver_sensor_data->semaphore, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Could not take semaphore!");
+        return ESP_FAIL;
+    }
 
     char *resp;
     asprintf(
@@ -68,6 +113,11 @@ static esp_err_t get_metrics_handler(httpd_req_t *req) {
         "heartrate_bpm %d"
         , webserver_sensor_data->illuminance, webserver_sensor_data->temperature, webserver_sensor_data->humidity, webserver_sensor_data->heartrate
     );
+
+    if (xSemaphoreGive(webserver_sensor_data->semaphore) != pdTRUE) {
+        ESP_LOGE(TAG, "Could not give semaphore!");
+        return ESP_FAIL;
+    }
 
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
