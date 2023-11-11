@@ -13,17 +13,6 @@ void get_am2320_data(i2c_dev_t* dev, am2320_data_t* out_data) {
     }
 }
 
-void get_photo_data(adc_oneshot_unit_handle_t* unit_handle, adc_channel_t channel, adc_cali_handle_t* cali_handle, bool is_calibrated, u_int32_t series_resistor, float input_voltage, photo_data_t *out_data) {
-    ESP_ERROR_CHECK(adc_oneshot_read(*unit_handle, channel, &out_data->raw));
-
-    if (is_calibrated) {
-        ESP_ERROR_CHECK(adc_cali_raw_to_voltage(*cali_handle, out_data->raw, &out_data->voltage));
-        float voltage_v = out_data->voltage / 1000.0;
-        out_data->resistence = (series_resistor * (input_voltage - voltage_v))/voltage_v;
-        out_data->lux = 500 / (out_data->resistence / 1000);
-    }
-}
-
 u_int8_t get_heart_rate(adc_oneshot_unit_handle_t *unit_handle, adc_channel_t channel, u_int16_t heartbeat_threshold, u_int8_t required_beats, u_int32_t timeout_ms, gpio_num_t led_gpio) {
     int heartrate_raw = 0;
     int64_t timeout_time = esp_timer_get_time();

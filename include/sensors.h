@@ -7,14 +7,6 @@ typedef struct am2320_data
     float humidity;
 } am2320_data_t;
 
-typedef struct photo_data
-{
-    int raw;
-    int voltage;
-    float resistence;
-    float lux;
-} photo_data_t;
-
 /**
  * Get temperature and humidity data from an AM2320 sensor
  * 
@@ -22,19 +14,6 @@ typedef struct photo_data
  * @param out_data Pointer for returning the AM2320 data
  */
 void get_am2320_data(i2c_dev_t* dev, am2320_data_t* out_data);
-
-/**
- * Get photo data from an ADC channel
- * 
- * @param unit_handle ADC oneshot unit handle
- * @param channel ADC channel to read from
- * @param cali_handle ADC calibration handle
- * @param is_calibrated Whether calibration for conversion to voltage has been done
- * @param series_resistor Resistance of the series resistor in Ohms
- * @param input_voltage Input voltage in volts
- * @param out_data Pointer for returning the photo data
- */
-void get_photo_data(adc_oneshot_unit_handle_t* unit_handle, adc_channel_t channel, adc_cali_handle_t* cali_handle, bool is_calibrated, u_int32_t series_resistor, float input_voltage, photo_data_t *out_data);
 
 /**
  * Calculates the heart rate in beats per minute (BPM) using an ADC to measure the heart rate pulse

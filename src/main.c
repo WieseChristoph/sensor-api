@@ -4,6 +4,7 @@
 #include "driver/gpio.h"
 #include "am2320.h"
 #include "tsl2561.h"
+#include "hx710b.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -87,19 +88,31 @@ void app_main() {
     ESP_ERROR_CHECK(tsl2561_init_desc(&tsl2561_dev, TSL2561_I2C_ADDR_FLOAT, I2C_NUM_0, I2C_SDA_PIN, I2C_SCL_PIN));
     ESP_ERROR_CHECK(tsl2561_init(&tsl2561_dev));
 
+    //-------------HX710B Init---------------//
+    // hx710b_t hx710b_dev = {0};
+    // hx710b_init(&hx710b_dev, PRESSURE_SENSOR_SCK_PIN, PRESSURE_SENSOR_OUT_PIN, HX710B_GAIN_128);
+
+    // while (1)
+    // {
+    //     float out = hx710b_read_hpa(&hx710b_dev);
+    //     ESP_LOGI(TAG, "Pressure: %f", out);
+    //     vTaskDelay(pdMS_TO_TICKS(1000));
+    // }
+    
+
     //-------------ADC Init---------------//
     adc_oneshot_unit_t adc_oneshot = {0};
     adc_oneshot_unit_init(ADC_UNIT_1, ADC_ATTEN, &adc_oneshot);
 
     //-------------ADC Config---------------//
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_oneshot.adc_handle, HEARTRATE_SENSOR_GPIO_ADC, &adc_oneshot.adc_chan_config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_oneshot.adc_handle, HEARTRATE_SENSOR_ADC_CHANNEL, &adc_oneshot.adc_chan_config));
 
     //-------------Webserver Init---------------//
     webserver_sensor_data_t webserver_sensor_data = {
         .am2320_i2c_dev = &am2320_i2c_dev,
         .tsl2561_dev = &tsl2561_dev,
         .adc_oneshot_unit = &adc_oneshot,
-        .heartrate_adc_channel = HEARTRATE_SENSOR_GPIO_ADC,
+        .heartrate_adc_channel = HEARTRATE_SENSOR_ADC_CHANNEL,
         .heartbeat_threshold = HEARTBEAT_THRESHOLD,
         .required_heartbeats = REQUIRED_HEARTBEATS,
         .heartbeat_timeout_ms = HEARTBEAT_TIMEOUT_MS,
