@@ -1,7 +1,8 @@
 #include "webserver.h"
 #include "esp_event.h"
 #include "esp_log.h"
-#include "sensors.h"
+#include "heartrate.h"
+#include "am2320.h"
 
 const static char *TAG = "webserver";
 
@@ -22,11 +23,14 @@ static esp_err_t get_illuminance_handler(httpd_req_t *req) {
 static esp_err_t get_temp_handler(httpd_req_t *req) {
     webserver_sensor_data_t *webserver_sensor_data = (webserver_sensor_data_t *) req->user_ctx;
 
-    am2320_data_t am2320_data = {0};
-    get_am2320_data(webserver_sensor_data->am2320_i2c_dev, &am2320_data);
+    float temperature = 0;
+    esp_err_t res = am2320_get_rht(webserver_sensor_data->am2320_i2c_dev, &temperature, NULL);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Error reading AM2320 data: %d (%s)", res, esp_err_to_name(res));
+    }
 
     char *resp;
-    asprintf(&resp, "%.1f°C", am2320_data.temperature);
+    asprintf(&resp, "%.1f°C", temperature);
 
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
@@ -36,11 +40,14 @@ static esp_err_t get_temp_handler(httpd_req_t *req) {
 static esp_err_t get_hum_handler(httpd_req_t *req) {
     webserver_sensor_data_t *webserver_sensor_data = (webserver_sensor_data_t *) req->user_ctx;
 
-    am2320_data_t am2320_data = {0};
-    get_am2320_data(webserver_sensor_data->am2320_i2c_dev, &am2320_data);
+    float humidity = 0;
+    esp_err_t res = am2320_get_rht(webserver_sensor_data->am2320_i2c_dev, NULL, &humidity);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Error reading AM2320 data: %d (%s)", res, esp_err_to_name(res));
+    }
 
     char *resp;
-    asprintf(&resp, "%.1f%%", am2320_data.humidity);
+    asprintf(&resp, "%.1f%%", humidity);
 
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
@@ -73,8 +80,12 @@ static esp_err_t get_metrics_handler(httpd_req_t *req) {
     u_int32_t illuminance = 0;
     tsl2561_read_lux(webserver_sensor_data->tsl2561_dev, &illuminance);
 
-    am2320_data_t am2320_data = {0};
-    get_am2320_data(webserver_sensor_data->am2320_i2c_dev, &am2320_data);
+    float temperature = 0;
+    float humidity = 0;
+    esp_err_t res = am2320_get_rht(webserver_sensor_data->am2320_i2c_dev, &temperature, &humidity);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Error reading AM2320 data: %d (%s)", res, esp_err_to_name(res));
+    }
 
     u_int8_t heartrate = get_heart_rate(
         &webserver_sensor_data->adc_oneshot_unit->adc_handle, 
@@ -100,7 +111,7 @@ static esp_err_t get_metrics_handler(httpd_req_t *req) {
         "# HELP heartrate_bpm Heart rate in beats per minute\n"
         "# TYPE heartrate_bpm gauge\n"
         "heartrate_bpm %d"
-        , illuminance, am2320_data.temperature, am2320_data.humidity, heartrate
+        , illuminance, temperature, humidity, heartrate
     );
 
     httpd_resp_set_type(req, "text/plain");

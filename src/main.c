@@ -9,7 +9,6 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "sdkconfig.h"
-#include "sensors.h"
 #include "adc.h"
 #include "wifi.h"
 #include "webserver.h"
@@ -98,7 +97,6 @@ void app_main() {
     //     ESP_LOGI(TAG, "Pressure: %f", out);
     //     vTaskDelay(pdMS_TO_TICKS(1000));
     // }
-    
 
     //-------------ADC Init---------------//
     adc_oneshot_unit_t adc_oneshot = {0};
@@ -125,35 +123,6 @@ void app_main() {
         // gpio_set_level(GREEN_GPIO, gpio_get_level(GREEN_GPIO) ^ 1);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
-
-    // for(;;) {
-    //     ESP_LOGI(TAG, "-----------------------------");
-
-    //     //-------------LED Toggle---------------//
-    //     gpio_set_level(WIFI_DISCONNECT_LED_GPIO, gpio_get_level(WIFI_DISCONNECT_LED_GPIO) ^ 1);
-    //     gpio_set_level(HEARTBEAT_LED_GPIO, gpio_get_level(HEARTBEAT_LED_GPIO) ^ 1);
-
-    //     // //-------------Photo-Sensor Read---------------//
-    //     photo_data_t photo_data = {0};
-    //     get_photo_data(&adc_oneshot.adc_handle, PHOTO_SENSOR_GPIO_ADC, &adc_cali_photo_handle, photo_is_calibrated, PHOTO_SENSOR_SERIES_RESISTOR, INPUT_VOLTAGE, &photo_data);
-    //     ESP_LOGI(TAG, "ADC%d Channel[%d] [Photo] Raw: %d, Voltage: %d mV, Resistence: %f Ohm, Intensity: %f Lux", ADC_UNIT_1 + 1, PHOTO_SENSOR_GPIO_ADC, photo_data.raw, photo_data.voltage, photo_data.resistence, photo_data.lux);
-
-    //     //-------------AM2320 Read---------------//
-    //     am2320_data_t temp_hum_data = {0};
-    //     get_am2320_data(&am2320_i2c_dev, &temp_hum_data);
-    //     ESP_LOGI(TAG, "Temperature: %.1f°C, Humidity: %.1f%%", temp_hum_data.temperature, temp_hum_data.humidity);
-
-    //     //-------------Heart-Rate Read---------------//
-    //     u_int8_t bpm = get_heart_rate(&adc_oneshot.adc_handle, HEARTRATE_SENSOR_GPIO_ADC, 3000, 5, 5, HEARTBEAT_LED_GPIO);
-    //     ESP_LOGI(TAG, "Heartrate: %d Bpm", bpm);
-
-    //     //-------------LED Toggle---------------//
-    //     gpio_set_level(WIFI_DISCONNECT_LED_GPIO, gpio_get_level(WIFI_DISCONNECT_LED_GPIO) ^ 1);
-    //     gpio_set_level(HEARTBEAT_LED_GPIO, gpio_get_level(HEARTBEAT_LED_GPIO) ^ 1);
-
-    //     //-------------1s Delay---------------//
-    //     vTaskDelay(pdMS_TO_TICKS(1000));
-    // }
 
     // Tear Down Webserver
     stop_webserver(server);

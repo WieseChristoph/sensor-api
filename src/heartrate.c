@@ -1,17 +1,9 @@
-#include "sensors.h"
-#include "driver/gpio.h"
+#include "heartrate.h"
 #include "am2320.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 
-static const char* TAG = "sensors";
-
-void get_am2320_data(i2c_dev_t* dev, am2320_data_t* out_data) {
-    esp_err_t res = am2320_get_rht(dev, &out_data->temperature, &out_data->humidity);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Error reading data: %d (%s)", res, esp_err_to_name(res));
-    }
-}
+static const char* TAG = "heart_rate";
 
 u_int8_t get_heart_rate(adc_oneshot_unit_handle_t *unit_handle, adc_channel_t channel, u_int16_t heartbeat_threshold, u_int8_t required_beats, u_int32_t timeout_ms, gpio_num_t led_gpio) {
     int heartrate_raw = 0;
